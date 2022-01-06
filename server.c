@@ -34,7 +34,7 @@
 typedef struct header{
 	unsigned int seq_num;
 	unsigned int ack_num;
-	unsigned char isLast;
+	unsigned char is_last;
 }Header;
 
 //==================
@@ -135,10 +135,11 @@ int sendFile(FILE *fd)
 	 * 
 	 ************************************************/
 	
+	fseek(fd, 0, SEEK_SET);
 	int index = 0, numbytes = 0; 
 	snd_pkt.header.seq_num = 0;
 	snd_pkt.header.ack_num = 0;
-	snd_pkt.header.isLast = 0;
+	snd_pkt.header.is_last = 0;
 	struct timeval t ;
 	t.tv_usec = 100000;
 	t.tv_sec = 0;
@@ -148,34 +149,50 @@ int sendFile(FILE *fd)
 	//==========================
 	// Send video data to client
 	//==========================
+	memset(snd_pkt.data, '\0',sizeof(snd_pkt.data));
 	if(filesize - 1024 >=0){
-		pread(fileno(fd), snd_pkt.data, 1024, index);
+		fread(snd_pkt.data,  sizeof(char), 1024,fd);
 	}else{
-		pread(fileno(fd), snd_pkt.data, filesize - index, index);
+		fread(snd_pkt.data, sizeof(char), filesize - index , fd);
 	}
+	int i =0;
+	char c;
+	// while(i<1024 && i + index< filesize){
+	// 	snd_pkt.data[i] = fgetc(fd);
+		
+	// 	i++;
+	// }
 
 
-	if ((numbytes = sendto(sockfd, &snd_pkt, sizeof(snd_pkt), 0,(struct sockaddr *)&client_info, len)) == -1) 
-	{
-		printf("server sendto error\n");
-		return 0;
+	// printf("%s", snd_pkt.data);
+	while(1){
+		if ((numbytes = sendto(sockfd, &snd_pkt, sizeof(snd_pkt), 0,(struct sockaddr *)&client_info, len)) == -1) 
+		{
+			printf("sendto error\n");
+			return 0;
+		}
+		
+		//======================================
+		// Checking timeout 
+		//======================================	
+		int recieve;
+		if( (recieve = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&t, sizeof(t)))== -1 ){
+			printf("set time out failed!!\n");
+			return 0;
+
+		}
+
+		int recvlen = recvfrom(sockfd, &rcv_pkt, sizeof(rcv_pkt), 0, (struct sockaddr *)&client_info, (socklen_t *)&len);
+		if(recvlen == -1){
+			printf("Time out!! Resend packet seq = %d\n", snd_pkt.header.seq_num);
+			continue;
+		}
+		printf("ACK file, send = %d, recv ACK = %d\n", snd_pkt.header.seq_num, rcv_pkt.header.ack_num);
+		break;
 	}
-	
-	//======================================
-	// Checking timeout 
-	//======================================	
-	int recieve;
-	if( (recieve = setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&t, sizeof(t)))== -1 ){
-		printf("Time out!! Resend Packet!!\n");
-		continue;
-
-	}
-	//how to handle Akt pkt? maybe the ack number does not matter the fact that we re receive sth
-	printf("server success receive smth\n");
-
 
 	//check whether recieve the last ack
-	if(snd_pkt.header.isLast == 1)
+	if(snd_pkt.header.is_last == 1)
 		break;
 
 	index += 1024;
@@ -184,12 +201,13 @@ int sendFile(FILE *fd)
 	// Set is_last flag for the last part of packet
 	//=============================================
 	snd_pkt.header.seq_num = snd_pkt.header.seq_num +1;
-		if(filesize - 1024 < 0){
-			snd_pkt.header.isLast = 1;
+		if(filesize - index - 1025 < 0){
+			snd_pkt.header.is_last = 1;
+			printf("last of file! %d", filesize - index);
 		}
 	
 	}
-
+	memset(&rcv_pkt,'\0',sizeof(rcv_pkt));
 	printf("send file successfully\n");
 	fclose(fd);
 	return 0;
@@ -250,7 +268,7 @@ int main(int argc, char *argv[])
 		//=========================
 		snd_pkt.header.seq_num = 0;
 		snd_pkt.header.ack_num = 0;
-		snd_pkt.header.isLast = 0;
+		snd_pkt.header.is_last = 0;
 		FILE *fd;
 		
 		printf("server waiting.... \n");
@@ -258,10 +276,11 @@ int main(int argc, char *argv[])
 		while ((recvfrom(sockfd, &rcv_pkt, sizeof(rcv_pkt), 0, (struct sockaddr *)&client_info, (socklen_t *)&len)) != -1)
 		{
 			//In client, we set is_last 1 to confirm server get client's first message.
-			if(rcv_pkt.header.isLast == 1)
+			if(rcv_pkt.header.is_last == 1)
 				break;
 		}  
 		printf("process command.... \n");
+		printf("data: %s\n", rcv_pkt.data);
 		str = strtok(rcv_pkt.data, " ");
 		
 		//===============================================================

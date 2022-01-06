@@ -89,61 +89,80 @@ int recvFile(FILE *fd)
 	char buffer[123431];
 	int index=0;
 	int receive_packet=0;
-	memset(snd_pkt.data, '\0', sizeof(snd_pkt.data));
 	memset(buffer, '\0', sizeof(buffer));
+
+	strcpy(snd_pkt.data, "ACK");
+	snd_pkt.header.seq_num = 0;
+	snd_pkt.header.is_last = 0;
+	snd_pkt.header.ack_num = 0;
 	while(1) 
 	{
 		//=========================================================
 		// You should receive packet at the beginning of while loop		
 		//=========================================================
 		// eg. while(recvfrom()....)
-
-		while((recvfrom(sockfd, &rcv_pkt, sizeof(rcv_pkt), 0, (struct sockaddr *)&info, (socklen_t *)&len)) == -1){
+		printf("new round...\n");
+		memset(rcv_pkt.data, '\0', sizeof(rcv_pkt.data));
+		while((recvfrom(sockfd, &rcv_pkt, sizeof(rcv_pkt), 0, (struct sockaddr *)&info, (socklen_t *)&len)) != -1){
 		//=======================
 		// Simulation packet loss
 		//=======================
 			if(isLoss(0.5))
 			{
 				printf("\tOops! Packet loss!\n");
-				break;
+				continue;
 			}
-			printf("Receive a packet (sequence_number = %d, ACK number = %d", rcv_pkt.header.seq_num, rcv_pkt.header.seq_num);
+			
 		//==============================================
 		// Actually receive packet and write into buffer
 		//==============================================
 			int data_size = sizeof(rcv_pkt.data)/sizeof(char);
-			strcat(buffer, rcv_pkt.data);
-
+			// strcat(buffer, rcv_pkt.data);
+			// printf("%s\n", rcv_pkt.data);
 		
 		
 		//==============================================
 		// Write buffer into file if is_last flag is set
 		//==============================================
+		int numbytes;
 			if(rcv_pkt.header.is_last){
-				write(fileno(fd), buffer, (ssize_t) sizeof(buffer));
+				numbytes = fwrite(rcv_pkt.data, (ssize_t) sizeof(char), (ssize_t) sizeof(char) * 551 ,fd);
+				printf("write %d bits before close", numbytes);
+		
+			
+		
+				fclose(fd);
+			}else{
+				numbytes = fwrite(rcv_pkt.data, (ssize_t) sizeof(char), (ssize_t) sizeof(rcv_pkt.data) ,fd);
+				printf("write %d bits before close", numbytes);
+		
 			}
-
-
 		//====================
 		// Reply ack to server
 		//====================
 
 			snd_pkt.header.seq_num = 0;
 			snd_pkt.header.ack_num = rcv_pkt.header.seq_num;
-			if(snd_pkt.header.is_last)
+			if(rcv_pkt.header.is_last)
 				snd_pkt.header.is_last = 1;
 			
-			int numbytes;
+			
 			
 			//========================
-			// Send filename to server
+			// Send file to server
 			//========================
 			if ((numbytes = sendto(sockfd, &snd_pkt, sizeof(snd_pkt), 0,(struct sockaddr *)&info, len)) == -1) 
 			{
 				perror("error");
 				return 0;
 			}
+			printf("Rcv pkt (seq num= %d, ACK number = %d\n", rcv_pkt.header.seq_num, rcv_pkt.header.seq_num);
+			if(rcv_pkt.header.is_last)
+				break;
+			
 		}
+		if(snd_pkt.header.is_last)
+				break;
 	}
 	return 0;
 }
@@ -264,4 +283,7 @@ int main(int argc, char *argv[])
 
 }
 
+// 127.0.0.1
+// 9999
+// download v.mp4
 
