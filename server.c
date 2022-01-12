@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
 	// argv[1] is for server port
 	//===========================
 	sockfd = socket(AF_INET , SOCK_DGRAM , 0);
-
+	int flag = 0;
 	if (sockfd == -1)
 	{
 		printf("Fail to create a socket.");
@@ -273,6 +273,7 @@ int main(int argc, char *argv[])
 		
 		printf("server waiting.... \n");
 		char *str;
+		if(flag == 0){
 		while ((recvfrom(sockfd, &rcv_pkt, sizeof(rcv_pkt), 0, (struct sockaddr *)&client_info, (socklen_t *)&len)) != -1)
 		{
 			//In client, we set is_last 1 to confirm server get client's first message.
@@ -318,7 +319,7 @@ int main(int argc, char *argv[])
                 		printf("FILE_EXISTS\n");
 				strcpy(snd_pkt.data, "FILE_EXISTS");
 				
-				
+				flag =1;
 				//==================================
 				// Send FILE_EXIST msg to the client
 				//==================================
@@ -348,5 +349,8 @@ int main(int argc, char *argv[])
 		{
 			printf("Illegal request!\n");   
 		}
+		}else
+			break;
+
 	}
 }

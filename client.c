@@ -127,14 +127,14 @@ int recvFile(FILE *fd)
 		int numbytes;
 			if(rcv_pkt.header.is_last){
 				numbytes = fwrite(rcv_pkt.data, (ssize_t) sizeof(char), (ssize_t) sizeof(char) * 551 ,fd);
-				printf("write %d bits before close", numbytes);
+				// printf("write %d bits before close", numbytes);
 		
 			
 		
 				fclose(fd);
 			}else{
 				numbytes = fwrite(rcv_pkt.data, (ssize_t) sizeof(char), (ssize_t) sizeof(rcv_pkt.data) ,fd);
-				printf("write %d bits before close", numbytes);
+				// printf("write %d bits before close", numbytes);
 		
 			}
 		//====================
